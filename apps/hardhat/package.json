@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "hardhat node",
     "build": "hardhat compile",
+    "typecheck": "tsc --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

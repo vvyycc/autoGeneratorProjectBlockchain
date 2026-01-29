@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "pnpm -r --parallel --filter ./apps/web --filter ./apps/api dev",
     "lint": "pnpm -r lint",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "verify": "node tools/verify.mjs"
   }
 }
