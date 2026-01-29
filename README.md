@@ -19,6 +19,9 @@ packages/
 ```bash
 pnpm install
 
+# Configuración de entorno (web)
+cp apps/web/.env.local.example apps/web/.env.local
+
 # Desarrollo (web + api)
 pnpm dev
 
