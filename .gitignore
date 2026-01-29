@@ -3,3 +3,6 @@ apps/hardhat/node_modules/*
 apps/web/node_modules/*
 node_modules/*
 apps/web/.next/*
+packages/shared/node_modules/*
+package-lock.json
+pnpm-lock.yaml
