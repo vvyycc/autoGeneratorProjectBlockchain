@@ -1,0 +1,11 @@
+{
+  "name": "sale-factory-studio",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./apps/web --filter ./apps/api dev",
+    "lint": "pnpm -r lint",
+    "build": "pnpm -r build"
+  }
+}
