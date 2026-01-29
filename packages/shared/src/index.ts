@@ -10,5 +10,6 @@ export type StatusResponse = z.infer<typeof statusSchema>;
 export const sharedGreeting = (team: string) =>
   `Hola ${team}, el monorepo está listo para construir.`;
 
+export * from "./demoProject";
 export * from "./schema";
 export * from "./types";
