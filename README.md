@@ -27,6 +27,12 @@ pnpm lint
 pnpm build
 ```
 
+## Verification
+
+```bash
+pnpm verify
+```
+
 ## Notas
 
 - Alias de TS: `@sale-factory/shared` está configurado en `tsconfig.base.json` y consumido en `apps/web` y `apps/api`.
