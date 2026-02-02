@@ -35,7 +35,7 @@ contract SaleManager is Ownable {
     event TokensClaimed(bytes32 indexed roundId, address indexed buyer, uint256 tokens);
     event Withdrawn(address indexed to, uint256 amount);
 
-    constructor(address token_) Ownable(msg.sender) {
+    constructor(address token_) {
         require(token_ != address(0), "Token required");
         token = IERC20(token_);
     }

@@ -14,7 +14,7 @@ contract Token is ERC20, Ownable {
         uint256 initialSupply,
         uint256 maxSupply_,
         uint16 burnFeeBps_
-    ) ERC20(name_, symbol_) Ownable(msg.sender) {
+    ) ERC20(name_, symbol_) Ownable() {
         require(burnFeeBps_ <= 10_000, "Burn fee too high");
         maxSupply = maxSupply_;
         burnFeeBps = burnFeeBps_;
@@ -31,10 +31,10 @@ contract Token is ERC20, Ownable {
         _mint(to, amount);
     }
 
-    // OZ v5: usar _update como hook
-    function _update(address from, address to, uint256 amount) internal override {
+    // OZ v4: usar _transfer como hook
+    function _transfer(address from, address to, uint256 amount) internal override {
         if (burnFeeBps == 0 || from == address(0) || to == address(0)) {
-            super._update(from, to, amount);
+            super._transfer(from, to, amount);
             return;
         }
 
@@ -42,9 +42,8 @@ contract Token is ERC20, Ownable {
         uint256 sendAmount = amount - burnAmount;
 
         if (burnAmount > 0) {
-            // quema del emisor
-            super._update(from, address(0), burnAmount);
+            _burn(from, burnAmount);
         }
-        super._update(from, to, sendAmount);
+        super._transfer(from, to, sendAmount);
     }
 }
