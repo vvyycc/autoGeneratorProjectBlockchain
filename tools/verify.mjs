@@ -2,9 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-const rootDir = process.cwd();
-
-const criticalPaths = [
+const mustExist = [
   "packages/shared/src/schema.ts",
   "packages/shared/src/types.ts",
   "packages/shared/src/index.ts",
@@ -18,144 +16,75 @@ const criticalPaths = [
   "apps/hardhat/hardhat.config.ts"
 ];
 
-const run = (cmd, args, opts = {}) =>
-  new Promise((resolve) => {
-    const child = spawn(cmd, args, {
-      stdio: "inherit",
-      shell: false,
-      ...opts
+function exists(p) {
+  return fs.existsSync(path.resolve(process.cwd(), p));
+}
+
+function runCmd(cmd) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, { shell: true, stdio: "inherit" });
+
+    child.on("error", (err) => {
+      reject(new Error(`Failed to start command: ${cmd}\n${err.message}`));
     });
 
-    child.on("close", (code) => resolve(code ?? 1));
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Command failed (${code}): ${cmd}`));
+    });
   });
+}
 
-const exists = (targetPath) => fs.existsSync(path.join(rootDir, targetPath));
-
-const prettyPrint = (results) => {
-  console.log("\nVerification Report:");
-  for (const result of results) {
-    const icon = result.ok ? "✅" : "❌";
-    console.log(`${icon} ${result.label}`);
-  }
-};
-
-const collectWorkspacePackages = () => {
-  const roots = ["apps", "packages"];
-  const packages = [];
-
-  for (const base of roots) {
-    const basePath = path.join(rootDir, base);
-
-    if (!fs.existsSync(basePath)) {
-      continue;
-    }
-
-    const entries = fs.readdirSync(basePath, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-
-      const packageJsonPath = path.join(basePath, entry.name, "package.json");
-
-      if (fs.existsSync(packageJsonPath)) {
-        packages.push(packageJsonPath);
-      }
-    }
-  }
-
-  return packages;
-};
-
-const hasScript = (scriptName) => {
-  const packageJsonPaths = [
-    path.join(rootDir, "package.json"),
-    ...collectWorkspacePackages()
-  ];
-
-  for (const packageJsonPath of packageJsonPaths) {
-    try {
-      const raw = fs.readFileSync(packageJsonPath, "utf8");
-      const parsed = JSON.parse(raw);
-      if (parsed?.scripts?.[scriptName]) {
-        return true;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return false;
-};
-
-const hasHardhatTest = () => {
-  const hardhatPackagePath = path.join(rootDir, "apps/hardhat/package.json");
-
-  if (!fs.existsSync(hardhatPackagePath)) {
-    return false;
-  }
-
+function hasScript(pkgJsonPath, scriptName) {
   try {
-    const raw = fs.readFileSync(hardhatPackagePath, "utf8");
-    const parsed = JSON.parse(raw);
-    return Boolean(parsed?.scripts?.test);
+    const raw = fs.readFileSync(pkgJsonPath, "utf8");
+    const json = JSON.parse(raw);
+    return Boolean(json?.scripts?.[scriptName]);
   } catch {
     return false;
   }
-};
+}
 
-const main = async () => {
-  const results = [];
-  let failed = false;
+async function main() {
+  console.log("== Verify: files ==");
+  let ok = true;
 
-  for (const targetPath of criticalPaths) {
-    const ok = exists(targetPath);
-    results.push({
-      label: `exists ${targetPath}`,
-      ok
-    });
-    if (!ok) {
-      failed = true;
-    }
+  for (const p of mustExist) {
+    const present = exists(p);
+    console.log(`${present ? "✅" : "❌"} ${p}`);
+    if (!present) ok = false;
   }
 
-  const commands = [
-    { label: "pnpm -r typecheck", cmd: "pnpm", args: ["-r", "typecheck"] },
-    { label: "pnpm -r build", cmd: "pnpm", args: ["-r", "build"] }
-  ];
-
-  if (hasScript("lint")) {
-    commands.push({ label: "pnpm -r lint", cmd: "pnpm", args: ["-r", "lint"] });
+  if (!ok) {
+    process.exitCode = 1;
+    return;
   }
 
-  if (hasHardhatTest()) {
-    commands.push({
-      label: "pnpm --filter ./apps/hardhat test",
-      cmd: "pnpm",
-      args: ["--filter", "./apps/hardhat", "test"]
-    });
-  }
+  // detect if any workspace has lint
+  const workspaces = [
+    "package.json",
+    "apps/web/package.json",
+    "apps/api/package.json",
+    "apps/hardhat/package.json",
+    "packages/shared/package.json"
+  ].filter(exists);
 
-  for (const command of commands) {
-    const exitCode = await run(command.cmd, command.args);
-    const ok = exitCode === 0;
-    results.push({
-      label: command.label,
-      ok
-    });
-    if (!ok) {
-      failed = true;
-    }
-  }
+  const anyLint = workspaces.some((p) => hasScript(path.resolve(process.cwd(), p), "lint"));
+  const hardhatHasTest = exists("apps/hardhat/package.json") &&
+    hasScript(path.resolve(process.cwd(), "apps/hardhat/package.json"), "test");
 
-  prettyPrint(results);
-
-  if (failed) {
+  console.log("\n== Verify: commands ==");
+  try {
+    await runCmd("pnpm -r typecheck");
+    await runCmd("pnpm -r build");
+    if (anyLint) await runCmd("pnpm -r lint");
+    if (hardhatHasTest) await runCmd("pnpm --filter ./apps/hardhat test");
+    console.log("\n✅ Verify OK");
+  } catch (e) {
+    console.error("\n❌ Verify FAILED");
+    console.error(e?.message || e);
     process.exitCode = 1;
   }
-
-  console.log(`exitCode ${failed ? 1 : 0}`);
-};
+}
 
 main();
