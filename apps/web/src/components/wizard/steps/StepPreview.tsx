@@ -1,20 +1,44 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import type { ProjectConfig } from "@sale-factory/shared";
 
 import { themeOptions } from "../../ThemePicker";
+import DeployPanel from "../../DeployPanel";
 import StepShell from "../StepShell";
+
+type DeploymentsPayload = {
+  token?: { address?: string };
+  saleManager?: { address?: string };
+};
 
 const StepPreview = () => {
   const { watch } = useFormContext<ProjectConfig>();
   const values = watch();
+  const [deployments, setDeployments] = useState<DeploymentsPayload | null>(
+    null
+  );
+  const [copiedValue, setCopiedValue] = useState<string | null>(null);
 
   const theme = useMemo(() => {
     return themeOptions.find((option) => option.id === values.theme) ??
       themeOptions[0];
   }, [values.theme]);
+
+  const handleCopy = useCallback(async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedValue(value);
+      window.setTimeout(() => {
+        setCopiedValue((current) => (current === value ? null : current));
+      }, 2000);
+    } catch {
+      setCopiedValue(null);
+    }
+  }, []);
+
+  const slug = values.slug?.trim();
 
   return (
     <StepShell
@@ -155,7 +179,78 @@ const StepPreview = () => {
             </div>
           ) : null}
         </section>
+
+        <section className="mt-8 space-y-3">
+          <h2 className="text-lg font-semibold">Token Status</h2>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs uppercase tracking-[0.2em] text-white/60">
+                Status
+              </span>
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold">
+                {deployments ? "Deployed" : "Planned"}
+              </span>
+            </div>
+            {deployments ? (
+              <div className="mt-3 space-y-2 text-xs text-white/70">
+                {deployments.token?.address ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-white/80">Token:</span>
+                    <span className="truncate">{deployments.token.address}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(deployments.token?.address ?? "")}
+                      className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/70"
+                    >
+                      {copiedValue === deployments.token.address
+                        ? "Copied"
+                        : "Copy"}
+                    </button>
+                  </div>
+                ) : null}
+                {deployments.saleManager?.address ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-white/80">
+                      SaleManager:
+                    </span>
+                    <span className="truncate">
+                      {deployments.saleManager.address}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleCopy(deployments.saleManager?.address ?? "")
+                      }
+                      className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/70"
+                    >
+                      {copiedValue === deployments.saleManager.address
+                        ? "Copied"
+                        : "Copy"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-white/60">
+                Aún no hay deployments para este proyecto.
+              </p>
+            )}
+          </div>
+        </section>
       </div>
+
+      {!slug ? (
+        <div className="mt-6 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Save config first.
+        </div>
+      ) : null}
+
+      {slug ? (
+        <DeployPanel
+          slug={slug}
+          onDeployed={(payload) => setDeployments(payload)}
+        />
+      ) : null}
     </StepShell>
   );
 };

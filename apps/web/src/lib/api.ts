@@ -73,3 +73,40 @@ export async function deleteProject(slug: string) {
 
   return parseJson<{ ok: true }>(response);
 }
+
+export async function deployProject(slug: string, network: string) {
+  const response = await fetch(`${API_BASE}/projects/${slug}/deploy`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ network })
+  });
+
+  return parseJson<{ ok: true; deployments: unknown }>(response);
+}
+
+export async function getDeployments(slug: string) {
+  const response = await fetch(`${API_BASE}/projects/${slug}/deployments`, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  return parseJson<{ ok: true; deployments: unknown }>(response);
+}
+
+export async function getStatus(slug: string) {
+  const response = await fetch(`${API_BASE}/projects/${slug}/status`, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  return parseJson<{
+    ok: true;
+    project: ProjectConfig;
+    deployments?: unknown;
+  }>(response);
+}

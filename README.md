@@ -40,3 +40,4 @@ pnpm verify
 
 - Alias de TS: `@sale-factory/shared` está configurado en `tsconfig.base.json` y consumido en `apps/web` y `apps/api`.
 - API expone `/health` en `http://localhost:4000/health`.
+- `apps/web` usa `NEXT_PUBLIC_API_URL` para apuntar al backend (definido en `apps/web/.env.local`).
