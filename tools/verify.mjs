@@ -72,6 +72,37 @@ async function main() {
   const anyLint = workspaces.some((p) => hasScript(path.resolve(process.cwd(), p), "lint"));
   const hardhatHasTest = exists("apps/hardhat/package.json") &&
     hasScript(path.resolve(process.cwd(), "apps/hardhat/package.json"), "test");
+  const commands = [
+    { label: "pnpm -r typecheck", cmd: "pnpm -r typecheck" },
+    { label: "pnpm -r build", cmd: "pnpm -r build" }
+  ];
+
+  if (hasScript("lint")) {
+    commands.push({ label: "pnpm -r lint", cmd: "pnpm -r lint" });
+  }
+
+  if (hasHardhatTest()) {
+    commands.push({
+      label: "pnpm --filter ./apps/hardhat test",
+      cmd: "pnpm --filter ./apps/hardhat test"
+    });
+  }
+
+  for (const command of commands) {
+    let ok = true;
+    try {
+      await runCmd(command.cmd);
+    } catch {
+      ok = false;
+    }
+    results.push({
+      label: command.label,
+      ok
+    });
+    if (!ok) {
+      failed = true;
+    }
+  }
 
   console.log("\n== Verify: commands ==");
   try {
