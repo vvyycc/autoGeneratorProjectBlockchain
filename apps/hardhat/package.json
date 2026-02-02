@@ -17,6 +17,8 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "5.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.16.1",
     "hardhat": "2.22.10",
     "ts-node": "10.9.2",
     "typescript": "5.5.4"

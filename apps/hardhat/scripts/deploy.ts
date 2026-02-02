@@ -1,7 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
-import { ethers, hre } from "hardhat";
+import hre from "hardhat";
+
+const { ethers } = hre;
+
 
 dotenv.config();
 

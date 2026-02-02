@@ -1,14 +1,21 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
-    "resolveJsonModule": true,
+    "lib": ["ES2020"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "types": ["node", "mocha"],
+    "strict": true,
     "esModuleInterop": true,
-    "types": ["node", "hardhat"],
-    "noEmit": true
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "dist"
   },
-  "include": ["hardhat.config.ts", "scripts", "test"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "hardhat.config.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "typechain-types/**/*.ts"
+  ]
 }
