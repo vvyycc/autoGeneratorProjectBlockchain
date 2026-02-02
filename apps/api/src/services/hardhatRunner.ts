@@ -22,20 +22,10 @@ export const runHardhatDeploy = async (params: {
     throw new Error("Network is required.");
   }
 
-  const command = "pnpm";
-  const args = [
-    "--filter",
-    "./apps/hardhat",
-    "deploy",
-    "--",
-    "--network",
-    network,
-    "--slug",
-    params.slug
-  ];
+  const command = `pnpm --filter ./apps/hardhat deploy -- --network ${network} --slug ${params.slug}`;
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
+    const child = spawn(command, {
       cwd: repoRoot(),
       env: { ...process.env, PROJECT_SLUG: params.slug },
       shell: true
