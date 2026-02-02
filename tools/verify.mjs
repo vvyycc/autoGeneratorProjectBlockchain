@@ -18,15 +18,30 @@ const criticalPaths = [
   "apps/hardhat/hardhat.config.ts"
 ];
 
-const run = (cmd, args, opts = {}) =>
-  new Promise((resolve) => {
-    const child = spawn(cmd, args, {
+const runCmd = (cmdString) =>
+  new Promise((resolve, reject) => {
+    const child = spawn(cmdString, {
       stdio: "inherit",
-      shell: false,
-      ...opts
+      shell: true
     });
 
-    child.on("close", (code) => resolve(code ?? 1));
+    child.on("error", (error) => {
+      reject(error);
+    });
+
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve(code);
+        return;
+      }
+
+      const exitCode = code ?? 1;
+      const error = new Error(
+        `Command failed: ${cmdString} (exit code ${exitCode})`
+      );
+      error.code = exitCode;
+      reject(error);
+    });
   });
 
 const exists = (targetPath) => fs.existsSync(path.join(rootDir, targetPath));
@@ -121,25 +136,28 @@ const main = async () => {
   }
 
   const commands = [
-    { label: "pnpm -r typecheck", cmd: "pnpm", args: ["-r", "typecheck"] },
-    { label: "pnpm -r build", cmd: "pnpm", args: ["-r", "build"] }
+    { label: "pnpm -r typecheck", cmd: "pnpm -r typecheck" },
+    { label: "pnpm -r build", cmd: "pnpm -r build" }
   ];
 
   if (hasScript("lint")) {
-    commands.push({ label: "pnpm -r lint", cmd: "pnpm", args: ["-r", "lint"] });
+    commands.push({ label: "pnpm -r lint", cmd: "pnpm -r lint" });
   }
 
   if (hasHardhatTest()) {
     commands.push({
       label: "pnpm --filter ./apps/hardhat test",
-      cmd: "pnpm",
-      args: ["--filter", "./apps/hardhat", "test"]
+      cmd: "pnpm --filter ./apps/hardhat test"
     });
   }
 
   for (const command of commands) {
-    const exitCode = await run(command.cmd, command.args);
-    const ok = exitCode === 0;
+    let ok = true;
+    try {
+      await runCmd(command.cmd);
+    } catch {
+      ok = false;
+    }
     results.push({
       label: command.label,
       ok
