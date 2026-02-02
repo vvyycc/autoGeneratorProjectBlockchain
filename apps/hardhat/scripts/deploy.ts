@@ -1,12 +1,13 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
-import { ethers } from "hardhat";
+import { ethers, hre } from "hardhat";
 
 dotenv.config();
 
 type ProjectRound = {
   id: string;
+  name?: string;
   kind: "PRESALE" | "PUBLIC";
   start: string;
   end: string;
@@ -60,7 +61,15 @@ const main = async () => {
     throw new Error("Missing slug. Use --slug <project> or set PROJECT_SLUG.");
   }
 
-  const projectPath = path.join("/data", slug, "project.json");
+  const projectPath = path.resolve(
+    process.cwd(),
+    "..",
+    "..",
+    "data",
+    slug,
+    "project.json"
+  );
+  console.log("Project config path:", projectPath);
   const raw = readFileSync(projectPath, "utf-8");
   const project = JSON.parse(raw) as ProjectConfig;
 
@@ -74,7 +83,10 @@ const main = async () => {
   const parseTokenAmount = (value: string | number) =>
     ethers.parseUnits(toNumericString(value), decimals);
 
-  const initialSupply = parseTokenAmount(project.tokenomics.totalSupply);
+  const totalSupplyFromConfig = parseTokenAmount(
+    project.tokenomics.totalSupply
+  );
+  const initialSupply = 0n;
   const maxSupply = project.tokenomics.maxSupply
     ? parseTokenAmount(project.tokenomics.maxSupply)
     : 0n;
@@ -97,15 +109,27 @@ const main = async () => {
   const saleManagerAddress = await saleManager.getAddress();
 
   const rounds = [...project.rounds.preSales, ...project.rounds.publicSales];
-  const totalHardCap = rounds.reduce((total, round) => {
+  const totalHardCapTokens = rounds.reduce((total, round) => {
     return total + parseTokenAmount(round.hardCap);
   }, 0n);
 
-  if (totalHardCap > 0n) {
-    const transferTx = await token.transfer(saleManagerAddress, totalHardCap);
-    await transferTx.wait();
+  if (totalHardCapTokens > totalSupplyFromConfig) {
+    throw new Error(
+      `Total hard cap tokens (${totalHardCapTokens}) exceed total supply from config (${totalSupplyFromConfig}).`
+    );
+  }
+  if (maxSupply > 0n && totalHardCapTokens > maxSupply) {
+    throw new Error(
+      `Total hard cap tokens (${totalHardCapTokens}) exceed max supply (${maxSupply}).`
+    );
   }
 
+  if (totalHardCapTokens > 0n) {
+    const mintTx = await token.mint(saleManagerAddress, totalHardCapTokens);
+    await mintTx.wait();
+  }
+
+  const deploymentsRounds = [];
   for (const round of rounds) {
     if (round.acceptedCurrency !== "ETH") {
       console.warn(
@@ -113,12 +137,17 @@ const main = async () => {
       );
     }
 
-    const roundId = ethers.id(round.id);
+    const roundId = ethers.keccak256(
+      ethers.toUtf8Bytes(`${project.slug}:${round.kind}:${round.id}`)
+    );
+    const priceEthPerToken = ethers.parseEther(
+      toNumericString(round.price)
+    );
     const params = {
       kind: round.kind === "PRESALE" ? 0 : 1,
       start: parseTimestamp(round.start),
       end: parseTimestamp(round.end),
-      priceWeiPerToken: ethers.parseUnits(toNumericString(round.price), 18),
+      priceWeiPerToken: priceEthPerToken,
       hardCapTokens: parseTokenAmount(round.hardCap),
       minBuyTokens: parseTokenAmount(round.minBuy),
       maxBuyTokens: parseTokenAmount(round.maxBuy),
@@ -129,8 +158,49 @@ const main = async () => {
 
     const tx = await saleManager.createRound(roundId, params);
     await tx.wait();
+
+    deploymentsRounds.push({
+      roundId,
+      kind: round.kind,
+      name: round.name ?? round.id,
+      start: round.start,
+      end: round.end,
+      hardCapTokens: params.hardCapTokens.toString(),
+      priceWeiPerToken: priceEthPerToken.toString(),
+      whitelistEnabled: round.whitelistEnabled,
+      vestingEnabled: round.vestingEnabled
+    });
   }
 
+  const network = await ethers.provider.getNetwork();
+  const deploymentsPath = path.resolve(
+    process.cwd(),
+    "..",
+    "..",
+    "data",
+    slug,
+    "deployments.json"
+  );
+  mkdirSync(path.dirname(deploymentsPath), { recursive: true });
+  const deploymentsPayload = {
+    slug,
+    network: hre.network.name,
+    chainId: Number(network.chainId),
+    deployedAt: new Date().toISOString(),
+    token: {
+      address: tokenAddress,
+      name: project.name,
+      symbol: project.ticker,
+      decimals
+    },
+    saleManager: {
+      address: saleManagerAddress
+    },
+    rounds: deploymentsRounds
+  };
+  writeFileSync(deploymentsPath, JSON.stringify(deploymentsPayload, null, 2));
+
+  console.log("Deployments path:", deploymentsPath);
   console.log("Token deployed to:", tokenAddress);
   console.log("SaleManager deployed to:", saleManagerAddress);
   console.log("Rounds configured:", rounds.length);
