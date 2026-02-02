@@ -1,10 +1,8 @@
 import fs from "node:fs";
-import path from "node:path";
 
 import type { ProjectConfig } from "@sale-factory/shared";
 
-const DATA_ROOT = "/data";
-const PROJECT_FILE = "project.json";
+import { dataDir, isSafeSlug, projectJsonPath, projectDir } from "../utils/paths";
 
 export class DataStoreError extends Error {
   code: string;
@@ -16,7 +14,7 @@ export class DataStoreError extends Error {
 }
 
 const ensureDataRoot = () => {
-  fs.mkdirSync(DATA_ROOT, { recursive: true });
+  fs.mkdirSync(dataDir(), { recursive: true });
 };
 
 export const ensureSlugSafe = (slug: string) => {
@@ -30,24 +28,17 @@ export const ensureSlugSafe = (slug: string) => {
     throw new DataStoreError("INVALID_SLUG", "Slug is invalid.");
   }
 
-  if (normalized.includes("/") || normalized.includes("\\")) {
-    throw new DataStoreError("INVALID_SLUG", "Slug cannot contain path separators.");
-  }
-
-  if (!/^[a-z0-9-]+$/.test(normalized)) {
+  if (!isSafeSlug(normalized)) {
     throw new DataStoreError("INVALID_SLUG", "Slug must be lowercase and dash-safe.");
   }
 
   return normalized;
 };
 
-const projectDir = (slug: string) => path.join(DATA_ROOT, slug);
-const projectFilePath = (slug: string) => path.join(projectDir(slug), PROJECT_FILE);
-
 export const listProjects = (): Array<{ slug: string; name: string; updatedAt: string }> => {
   ensureDataRoot();
 
-  const entries = fs.readdirSync(DATA_ROOT, { withFileTypes: true });
+  const entries = fs.readdirSync(dataDir(), { withFileTypes: true });
   const projects: Array<{ slug: string; name: string; updatedAt: string }> = [];
 
   for (const entry of entries) {
@@ -63,7 +54,7 @@ export const listProjects = (): Array<{ slug: string; name: string; updatedAt: s
       continue;
     }
 
-    const filePath = projectFilePath(slug);
+    const filePath = projectJsonPath(slug);
 
     if (!fs.existsSync(filePath)) {
       continue;
@@ -90,7 +81,7 @@ export const listProjects = (): Array<{ slug: string; name: string; updatedAt: s
 
 export const readProject = (slug: string): ProjectConfig => {
   const safeSlug = ensureSlugSafe(slug);
-  const filePath = projectFilePath(safeSlug);
+  const filePath = projectJsonPath(safeSlug);
 
   if (!fs.existsSync(filePath)) {
     throw new DataStoreError("NOT_FOUND", `Project ${safeSlug} not found.`);
@@ -117,7 +108,7 @@ export const writeProject = (config: ProjectConfig): void => {
     updatedAt
   };
 
-  fs.writeFileSync(projectFilePath(safeSlug), JSON.stringify(payload, null, 2), "utf8");
+  fs.writeFileSync(projectJsonPath(safeSlug), JSON.stringify(payload, null, 2), "utf8");
 };
 
 export const deleteProject = (slug: string): void => {
