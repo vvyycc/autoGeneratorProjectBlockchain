@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { Router } from "express";
 import { validateProjectConfig } from "@sale-factory/shared";
 
@@ -6,8 +7,11 @@ import {
   deleteProject,
   listProjects,
   readProject,
-  writeProject
+  writeProject,
+  ensureSlugSafe
 } from "../storage/dataStore";
+import { deploymentsPath, projectJsonPath } from "../utils/paths";
+import { runHardhatDeploy } from "../services/hardhatRunner";
 
 const router = Router();
 
@@ -99,6 +103,104 @@ router.delete("/projects/:slug", (req, res) => {
     }
 
     sendError(res, 500, "DELETE_FAILED", "Unable to delete project.", error);
+  }
+});
+
+router.post("/projects/:slug/deploy", async (req, res) => {
+  try {
+    const safeSlug = ensureSlugSafe(req.params.slug);
+    const projectPath = projectJsonPath(safeSlug);
+
+    if (!fs.existsSync(projectPath)) {
+      sendError(res, 404, "NOT_FOUND", `Project ${safeSlug} not found.`);
+      return;
+    }
+
+    const network = (req.body as { network?: string })?.network?.trim();
+
+    if (!network) {
+      sendError(res, 400, "INVALID_NETWORK", "Network is required.");
+      return;
+    }
+
+    await runHardhatDeploy({ slug: safeSlug, network });
+
+    const deploymentsFile = deploymentsPath(safeSlug);
+
+    if (!fs.existsSync(deploymentsFile)) {
+      sendError(res, 500, "DEPLOYMENTS_MISSING", "Deployments file not found after deploy.");
+      return;
+    }
+
+    const deployments = JSON.parse(fs.readFileSync(deploymentsFile, "utf8")) as unknown;
+
+    res.json({ ok: true, deployments });
+  } catch (error) {
+    if (error instanceof DataStoreError) {
+      sendError(res, 400, error.code, error.message);
+      return;
+    }
+
+    sendError(
+      res,
+      500,
+      "DEPLOY_FAILED",
+      "Unable to deploy project.",
+      error instanceof Error ? error.message : error
+    );
+  }
+});
+
+router.get("/projects/:slug/deployments", (req, res) => {
+  try {
+    const safeSlug = ensureSlugSafe(req.params.slug);
+    const deploymentsFile = deploymentsPath(safeSlug);
+
+    if (!fs.existsSync(deploymentsFile)) {
+      sendError(res, 404, "NOT_FOUND", `Deployments for ${safeSlug} not found.`);
+      return;
+    }
+
+    const deployments = JSON.parse(fs.readFileSync(deploymentsFile, "utf8")) as unknown;
+
+    res.json({ ok: true, deployments });
+  } catch (error) {
+    if (error instanceof DataStoreError) {
+      sendError(res, 400, error.code, error.message);
+      return;
+    }
+
+    sendError(res, 500, "READ_FAILED", "Unable to read deployments.", error);
+  }
+});
+
+router.get("/projects/:slug/status", (req, res) => {
+  try {
+    const safeSlug = ensureSlugSafe(req.params.slug);
+    const projectPath = projectJsonPath(safeSlug);
+
+    if (!fs.existsSync(projectPath)) {
+      sendError(res, 404, "NOT_FOUND", `Project ${safeSlug} not found.`);
+      return;
+    }
+
+    const project = JSON.parse(fs.readFileSync(projectPath, "utf8")) as unknown;
+    const deploymentsFile = deploymentsPath(safeSlug);
+
+    if (fs.existsSync(deploymentsFile)) {
+      const deployments = JSON.parse(fs.readFileSync(deploymentsFile, "utf8")) as unknown;
+      res.json({ ok: true, project, deployments });
+      return;
+    }
+
+    res.json({ ok: true, project });
+  } catch (error) {
+    if (error instanceof DataStoreError) {
+      sendError(res, 400, error.code, error.message);
+      return;
+    }
+
+    sendError(res, 500, "STATUS_FAILED", "Unable to read project status.", error);
   }
 });
 
