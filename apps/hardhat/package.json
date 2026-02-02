@@ -4,9 +4,16 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "hardhat node",
-    "build": "hardhat compile",
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "test": "hardhat test",
+    "deploy": "hardhat run scripts/deploy.ts",
     "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "4.9.6",
+    "dotenv": "16.4.5",
+    "ethers": "6.13.4"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "5.0.0",
