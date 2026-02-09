@@ -7,3 +7,4 @@ packages/shared/node_modules/*
 package-lock.json
 pnpm-lock.yaml
 /apps/hardhat/artifacts
+/apps/hardhat/cache
