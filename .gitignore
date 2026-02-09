@@ -8,3 +8,4 @@ package-lock.json
 pnpm-lock.yaml
 /apps/hardhat/artifacts
 /apps/hardhat/cache
+/apps/hardhat/typechain-types
