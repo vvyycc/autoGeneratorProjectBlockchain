@@ -70,8 +70,20 @@ async function main() {
   ].filter(exists);
 
   const anyLint = workspaces.some((p) => hasScript(path.resolve(process.cwd(), p), "lint"));
-  const hardhatHasTest = exists("apps/hardhat/package.json") &&
-    hasScript(path.resolve(process.cwd(), "apps/hardhat/package.json"), "test");
+ function hasHardhatTest() {
+  const pkgPath = path.resolve(process.cwd(), "apps/hardhat/package.json");
+  if (!fs.existsSync(pkgPath)) return false;
+
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    return Boolean(pkg?.scripts?.test);
+  } catch {
+    return false;
+  }
+}
+if (hasHardhatTest()) {
+  await runCmd("pnpm --filter ./apps/hardhat test");
+}
   const commands = [
     { label: "pnpm -r typecheck", cmd: "pnpm -r typecheck" },
     { label: "pnpm -r build", cmd: "pnpm -r build" }
